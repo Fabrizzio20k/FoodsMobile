@@ -6,7 +6,7 @@ import React, {
     useEffect,
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { User } from "./Api";
+import { User } from "@/api/registerAndLoginApi";
 
 interface AuthContextType {
     token: string | null;

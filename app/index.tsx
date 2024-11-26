@@ -7,7 +7,7 @@ export default function HomeScreen() {
 
     return (
         <ImageBackground
-            source={require("../assets/background.png")}
+            source={require("../assets/Img2.jpg")}
             style={styles.background}
             resizeMode="cover"
         >
@@ -38,8 +38,19 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-    background: { flex: 1, justifyContent: "center" },
-    overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
+    background: {
+        flex: 1,
+        width: "100%",
+        height: "100%",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    overlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
     card: {
         width: "90%",
         padding: 20,

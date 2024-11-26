@@ -9,7 +9,7 @@ import {
     Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { login } from "../Api";
+import { login } from "../../api/registerAndLoginApi";
 import { useAuth } from "../useAuth";
 
 export default function LoginScreen() {
