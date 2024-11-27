@@ -46,7 +46,7 @@ export default function HomeLogged() {
 
                     <TouchableOpacity
                         style={styles.card}
-                        onPress={() => router.push("../screens/RestaurantsScreen")}
+                        onPress={() => router.push("../screens/RestaurantsPage")}
                     >
                         <Text style={styles.cardTitle}>Restaurantes</Text>
                         <Text style={styles.cardText}>

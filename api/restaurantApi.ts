@@ -1,5 +1,5 @@
 import axios from "axios";
-import { BASE_URL } from "@/Api";
+import { BASE_URL } from "../app/Api";
 
 export interface Restaurant {
     restaurantId: number;

@@ -271,3 +271,35 @@ export const getCommentsByFoodId = async (foodId: number, token: String) => {
     });
     return response.data;
 };
+
+
+
+// Función para actualizar el perfil del usuario
+export const updateUserProfile = async (userId: number, userData: any, image: File | null, token: string) => {
+  const formData = new FormData();
+
+  // Adjuntar los datos del usuario
+  formData.append(
+    "user",
+    new Blob([JSON.stringify(userData)], { type: "application/json" })
+  );
+
+  // Si hay imagen, adjuntarla
+  if (image) {
+    formData.append("image", image);
+  }
+
+  try {
+    const response = await axios.put(`${BASE_URL}/users/${userId}`, formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "multipart/form-data", // Asegúrate de enviar los datos como multipart/form-data
+      },
+    });
+
+    return response.data; // Retorna los datos del usuario actualizado
+  } catch (error) {
+    console.error("Error al actualizar el perfil", error);
+    throw new Error("Error al actualizar el perfil");
+  }
+};
