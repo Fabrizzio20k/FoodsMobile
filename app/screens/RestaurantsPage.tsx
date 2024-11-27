@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { getAllRestaurants, deleteRestaurant, createRestaurant, updateRestaurant } from "@/api/restaurantApi";
 import { useAuth } from "../useAuth"; // Importa el hook useAuth
 import { MaterialIcons } from '@expo/vector-icons'; // Icono de editar
+import MapView, { Marker } from "react-native-maps"; // Importar MapView y Marker
 
 const RestaurantsPage = () => {
   const router = useRouter();
@@ -11,6 +12,7 @@ const RestaurantsPage = () => {
 
   const [restaurants, setRestaurants] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false); // Para el modal de detalles
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
   const [restaurantData, setRestaurantData] = useState({
     name: "",
@@ -83,10 +85,16 @@ const RestaurantsPage = () => {
     }
   };
 
+  const handleViewDetails = (restaurant: any) => {
+    setSelectedRestaurant(restaurant);
+    setIsDetailsModalOpen(true);
+  };
+
   const renderRestaurant = ({ item }: { item: any }) => (
     <View style={styles.card}>
       {/* Cargar imagen usando Image */}
       <Image source={{ uri: item.image || "https://via.placeholder.com/150" }} style={styles.image} />
+
       <View style={styles.cardContent}>
         <Text style={styles.cardTitle}>{item.name}</Text>
         <Text style={styles.cardText}>Lat: {item.latitude}</Text>
@@ -101,11 +109,28 @@ const RestaurantsPage = () => {
       </View>
 
       <View style={styles.actions}>
-        <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
+        {/* Ícono de Editar en la esquina superior izquierda */}
+        <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButtonLeft}>
           <MaterialIcons name="edit" size={24} color="#333" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => handleDelete(item.restaurantId)} style={styles.actionButton}>
-          <Text style={styles.actionButtonText}>Eliminar</Text>
+
+        {/* Ícono de Borrar en la esquina superior derecha */}
+        <TouchableOpacity onPress={() => handleDelete(item.restaurantId)} style={styles.actionButtonRight}>
+          <MaterialIcons name="delete" size={24} color="red" />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.bottomActions}>
+        {/* Ver Platillos */}
+        <TouchableOpacity onPress={() => router.push(`/platillos/${item.restaurantId}`)} style={styles.actionButton}>
+          <MaterialIcons name="restaurant" size={24} color="#333" />
+          <Text style={styles.actionText}>Ver Platillos</Text>
+        </TouchableOpacity>
+
+        {/* Ver Detalles */}
+        <TouchableOpacity onPress={() => handleViewDetails(item)} style={styles.actionButton}>
+          <MaterialIcons name="visibility" size={24} color="#333" />
+          <Text style={styles.actionText}>Ver Detalles</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -119,9 +144,6 @@ const RestaurantsPage = () => {
           <Text style={styles.backButtonText}>Regresar</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Restaurantes</Text>
-        <TouchableOpacity onPress={() => setIsModalOpen(true)} style={styles.newRestaurantButton}>
-          <Text style={styles.newRestaurantButtonText}>+ Nuevo Restaurante</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Restaurant List */}
@@ -168,16 +190,71 @@ const RestaurantsPage = () => {
               onChangeText={(text) => setRestaurantData({ ...restaurantData, longitude: text })}
               keyboardType="numeric"
             />
+
             <TouchableOpacity
-              onPress={() => setRestaurantData({ ...restaurantData, status: restaurantData.status === "OPEN" ? "CLOSED" : "OPEN" })}
               style={styles.statusButton}
+              onPress={() =>
+                setRestaurantData({
+                  ...restaurantData,
+                  status: restaurantData.status === "OPEN" ? "CLOSED" : "OPEN",
+                })
+              }
             >
               <Text style={styles.statusButtonText}>
-                Cambiar estado a {restaurantData.status === "OPEN" ? "Cerrado" : "Abierto"}
+                {restaurantData.status === "OPEN" ? "Cambiar a Cerrado" : "Cambiar a Abierto"}
               </Text>
             </TouchableOpacity>
+
             <Button title="Guardar" onPress={handleSave} />
-            <Button title="Cancelar" onPress={() => setIsModalOpen(false)} />
+          </View>
+        </Modal>
+      )}
+
+      {/* Modal para ver los detalles del restaurante */}
+      {isDetailsModalOpen && (
+        <Modal
+          visible={isDetailsModalOpen}
+          onRequestClose={() => setIsDetailsModalOpen(false)}
+          animationType="slide"
+          transparent={true}
+        >
+          <View style={styles.detailsModalContainer}>
+            <View style={styles.detailsModalContent}>
+              <Text style={styles.modalTitle}>{selectedRestaurant?.name}</Text>
+              <Image
+                source={{ uri: selectedRestaurant?.image || "https://via.placeholder.com/150" }}
+                style={styles.image}
+              />
+              <Text style={styles.cardText}>Email: {selectedRestaurant?.email}</Text>
+              <Text style={styles.cardText}>Latitud: {selectedRestaurant?.latitude}</Text>
+              <Text style={styles.cardText}>Longitud: {selectedRestaurant?.longitude}</Text>
+              <Text style={styles.cardText}>
+                Estado:{" "}
+                <Text style={selectedRestaurant?.status === "OPEN" ? styles.statusOpen : styles.statusClosed}>
+                  {selectedRestaurant?.status === "OPEN" ? "Abierto" : "Cerrado"}
+                </Text>
+              </Text>
+
+              {/* Mapa de Google */}
+              <MapView
+                style={styles.map}
+                region={{
+                  latitude: parseFloat(selectedRestaurant?.latitude || "0"),
+                  longitude: parseFloat(selectedRestaurant?.longitude || "0"),
+                  latitudeDelta: 0.0922,
+                  longitudeDelta: 0.0421,
+                }}
+              >
+                <Marker coordinate={{
+                  latitude: parseFloat(selectedRestaurant?.latitude || "0"),
+                  longitude: parseFloat(selectedRestaurant?.longitude || "0")
+                }} />
+              </MapView>
+
+              <TouchableOpacity onPress={() => setIsDetailsModalOpen(false)} style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>Cerrar</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </Modal>
       )}
@@ -212,17 +289,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "bold",
   },
-  newRestaurantButton: {
-    padding: 10,
-    backgroundColor: "#fff",
-    borderColor: "#333",
-    borderWidth: 1,
-    borderRadius: 5,
-  },
-  newRestaurantButtonText: {
-    color: "#333",
-    fontSize: 16,
-  },
   card: {
     backgroundColor: "#fff",
     borderRadius: 10,
@@ -246,19 +312,47 @@ const styles = StyleSheet.create({
     color: "#666",
   },
   actions: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    right: 10,
     flexDirection: "row",
     justifyContent: "space-between",
+    width: "100%",
   },
-  actionButton: {
+  actionButtonLeft: {
     padding: 8,
     backgroundColor: "#fff",
     borderRadius: 5,
     borderColor: "#333",
     borderWidth: 1,
   },
-  actionButtonText: {
+  actionButtonRight: {
+    padding: 8,
+    backgroundColor: "#fff",
+    borderRadius: 5,
+    borderColor: "#333",
+    borderWidth: 1,
+  },
+  bottomActions: {
+    marginTop: 20,
+    marginBottom: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 10,
+    backgroundColor: "#fff",
+    borderRadius: 5,
+    borderColor: "#333",
+    borderWidth: 1,
+  },
+  actionText: {
+    fontSize: 16,
+    marginLeft: 8,
     color: "#333",
-    fontSize: 14,
   },
   statusOpen: {
     color: "green",
@@ -300,6 +394,35 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 200,
     borderRadius: 10,
+  },
+  map: {
+    width: "100%",
+    height: 200,
+    borderRadius: 10,
+    marginTop: 20,
+  },
+  detailsModalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+  },
+  detailsModalContent: {
+    width: "80%",
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 20,
+    alignItems: "center",
+  },
+  closeButton: {
+    marginTop: 20,
+    backgroundColor: "#FFC107",
+    padding: 10,
+    borderRadius: 5,
+  },
+  closeButtonText: {
+    color: "#fff",
+    fontSize: 16,
   },
 });
 
