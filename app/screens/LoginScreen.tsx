@@ -36,7 +36,6 @@ export default function LoginScreen() {
             setToken(response.token);
             setUser(response.user);
 
-            Alert.alert("Éxito", "Inicio de sesión exitoso.");
             router.push("../screens/HomeLogged");
         } catch (error) {
             console.error("Error al iniciar sesión:", error);

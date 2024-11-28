@@ -27,18 +27,21 @@ const ProfileScreen = () => {
   };
 
   const handleSaveChanges = async () => {
+    // Verificar el token antes de proceder
+    console.log("Token de autenticación:", token);  // Esto imprimirá el token para que puedas verificar su valor
+  
     if (!token) {
       Alert.alert("Error", "No se pudo obtener el token de autenticación.");
       return;
     }
-
+  
     if (!user || !user.userId) {  // Verificar si el user o el id son inválidos
       Alert.alert("Error", "No se pudo obtener el ID del usuario.");
       return;
     }
-
+  
     const formData = new FormData();
-
+  
     // Agregar datos del usuario (nombre, biografía)
     if (editedUserData) {
       formData.append(
@@ -48,40 +51,95 @@ const ProfileScreen = () => {
           { type: "application/json" }
         )
       );
+      console.log("Datos del usuario añadidos al FormData:", editedUserData);
     } else {
       Alert.alert("Error", "No se pudo obtener los datos del usuario editado.");
       return;
-    }    
-
-    if (profilePicture) {
-      const response = await fetch(profilePicture.uri);
-      const blob = await response.blob();
-      formData.append("image", blob, "profile.jpg");
     }
-
-    try {
-      const response = await fetch(`${BASE_URL}/users/${user.userId}`, {
+  
+    // Empaquetar la imagen seleccionada si existe
+    if (profilePicture) {
+      console.log("Imagen seleccionada:", profilePicture.uri);
+      fetch(profilePicture.uri)
+        .then((response) => response.blob())
+        .then((blob) => {
+          const file = {
+            uri: profilePicture.uri,
+            name: "profile.jpg",  // El nombre del archivo que deseas usar
+            type: "image/jpeg",   // El tipo de la imagen
+          };
+  
+          console.log("Archivo de imagen convertido en Blob:", file);
+          
+          // Agregar la imagen al FormData
+          formData.append("profilePicture", file);
+          console.log("Imagen añadida al FormData:", formData);
+  
+          // Hacer la solicitud PUT para actualizar el perfil
+          fetch(`${BASE_URL}/users/${user.userId}`, {
+            method: "PUT",
+            headers: {
+              Authorization: `Bearer ${token}`,  // El token es utilizado aquí
+            },
+            body: formData,
+          })
+            .then((response) => {
+              console.log("Respuesta del servidor:", response);
+              if (!response.ok) {
+                console.log("Error en la respuesta:", response);
+                return response.text().then((text) => {
+                  console.log("Cuerpo del error:", text); // Ver el contenido del error
+                  Alert.alert("Error", "Hubo un problema al actualizar el perfil. Intenta de nuevo.");
+                });
+              }
+              return response.json();
+            })
+            .then((updatedUser) => {
+              console.log("Perfil actualizado con éxito:", updatedUser);
+              setUser(updatedUser);
+              alert("Perfil actualizado correctamente");
+            })
+            .catch((error) => {
+              console.error("Error en la solicitud PUT:", error);
+              Alert.alert("Error", "Hubo un problema al actualizar el perfil. Intenta de nuevo.");
+            });
+        })
+        .catch((error) => {
+          console.error("Error al procesar la imagen:", error);
+          Alert.alert("Error", "Hubo un problema al procesar la imagen.");
+        });
+    } else {
+      // Si no hay imagen, solo actualiza los datos de usuario sin la imagen
+      fetch(`${BASE_URL}/users/${user.userId}`, {
         method: "PUT",
         headers: {
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error("Error al actualizar el perfil");
-      }
-
-      const updatedUser = await response.json();
-      setUser(updatedUser);
-      alert("Perfil actualizado correctamente");
-    } catch (error) {
-      console.error(error);
-      alert("Hubo un problema al actualizar el perfil. Intenta de nuevo.");
+      })
+        .then((response) => {
+          console.log("Respuesta del servidor:", response);
+          if (!response.ok) {
+            console.log("Error en la respuesta:", response);
+            return response.text().then((text) => {
+              console.log("Cuerpo del error:", text); // Ver el contenido del error
+              Alert.alert("Error", "Hubo un problema al actualizar el perfil. Intenta de nuevo.");
+            });
+          }
+          return response.json();
+        })
+        .then((updatedUser) => {
+          console.log("Perfil actualizado con éxito sin imagen:", updatedUser);
+          setUser(updatedUser);
+          alert("Perfil actualizado correctamente");
+        })
+        .catch((error) => {
+          console.error("Error en la solicitud PUT:", error);
+          Alert.alert("Error", "Hubo un problema al actualizar el perfil. Intenta de nuevo.");
+        });
     }
-
   };
-
+  
 
   // Función para cancelar los cambios
   const handleCancelEdit = () => {

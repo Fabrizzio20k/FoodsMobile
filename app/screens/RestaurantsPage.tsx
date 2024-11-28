@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Modal, TextInput, Button } from "react-native";
 import { useRouter } from "expo-router";
-import { getAllRestaurants, deleteRestaurant, createRestaurant, updateRestaurant } from "@/api/restaurantApi";
+import { getAllRestaurants, deleteRestaurant, createRestaurant, updateRestaurant } from "@/api/restaurantApi";  // Agregamos la función getPlatillosByRestaurant
 import { useAuth } from "../useAuth"; // Importa el hook useAuth
 import { MaterialIcons } from '@expo/vector-icons'; // Icono de editar
 import MapView, { Marker } from "react-native-maps"; // Importar MapView y Marker
 
-const RestaurantsPage = () => {
+export default function RestaurantsPage() {
   const router = useRouter();
   const { token, user, loading } = useAuth(); // Utiliza el hook useAuth para acceder al token y usuario
 
   const [restaurants, setRestaurants] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false); // Para el modal de detalles
+  const [isPlatillosModalOpen, setIsPlatillosModalOpen] = useState(false); // Para el modal de platillos
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
   const [restaurantData, setRestaurantData] = useState({
     name: "",
@@ -22,6 +23,7 @@ const RestaurantsPage = () => {
     status: "OPEN",
     image: null,
   });
+  const [platillos, setPlatillos] = useState([]); // Nuevo estado para los platillos
 
   // Fetch restaurants
   useEffect(() => {
@@ -90,6 +92,17 @@ const RestaurantsPage = () => {
     setIsDetailsModalOpen(true);
   };
 
+  // Nueva función para obtener los platillos de un restaurante
+  const handleViewPlatillos = async (restaurantId: number) => {
+    try {
+      const fetchedPlatillos = await getPlatillosByRestaurant(restaurantId, token); // Llamamos a la API
+      setPlatillos(fetchedPlatillos);
+      setIsPlatillosModalOpen(true);
+    } catch (error) {
+      console.error("Error fetching platillos:", error);
+    }
+  };
+
   const renderRestaurant = ({ item }: { item: any }) => (
     <View style={styles.card}>
       {/* Cargar imagen usando Image */}
@@ -122,7 +135,7 @@ const RestaurantsPage = () => {
 
       <View style={styles.bottomActions}>
         {/* Ver Platillos */}
-        <TouchableOpacity onPress={() => router.push(`/platillos/${item.restaurantId}`)} style={styles.actionButton}>
+        <TouchableOpacity onPress={() => handleViewPlatillos(item.restaurantId)} style={styles.actionButton}>
           <MaterialIcons name="restaurant" size={24} color="#333" />
           <Text style={styles.actionText}>Ver Platillos</Text>
         </TouchableOpacity>
@@ -139,12 +152,7 @@ const RestaurantsPage = () => {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>Regresar</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Restaurantes</Text>
-      </View>
+      
 
       {/* Restaurant List */}
       <FlatList
@@ -210,6 +218,38 @@ const RestaurantsPage = () => {
         </Modal>
       )}
 
+      {/* Modal para ver los platillos */}
+      {isPlatillosModalOpen && (
+        <Modal
+          visible={isPlatillosModalOpen}
+          onRequestClose={() => setIsPlatillosModalOpen(false)}
+          animationType="slide"
+        >
+          <View style={styles.detailsModalContainer}>
+            <View style={styles.detailsModalContent}>
+              <Text style={styles.modalTitle}>Platillos de {selectedRestaurant?.name}</Text>
+              
+              {/* Mostrar los platillos */}
+              <FlatList
+                data={platillos}
+                renderItem={({ item }) => (
+                  <View style={styles.card}>
+                    <Text style={styles.cardTitle}>{item.name}</Text>
+                    <Text style={styles.cardText}>Precio: {item.price}</Text>
+                    <Text style={styles.cardText}>Descripción: {item.description}</Text>
+                  </View>
+                )}
+                keyExtractor={(item) => item.id.toString()}
+              />
+
+              <TouchableOpacity onPress={() => setIsPlatillosModalOpen(false)} style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>Cerrar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
       {/* Modal para ver los detalles del restaurante */}
       {isDetailsModalOpen && (
         <Modal
@@ -255,19 +295,11 @@ const RestaurantsPage = () => {
           </View>
         </Modal>
       )}
-
-      {/* Botón flotante de agregar restaurante */}
-      <TouchableOpacity 
-        style={styles.floatingButton}
-        onPress={() => setIsModalOpen(true)}  // Abre el modal para agregar un nuevo restaurante
-      >
-        <MaterialIcons name="add" size={30} color="#fff" />
-      </TouchableOpacity>
     </View>
   );
 };
 
-// Estilos
+// Agregar los estilos necesarios para el nuevo modal de platillos y otros elementos relacionados
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -404,8 +436,8 @@ const styles = StyleSheet.create({
   floatingButton: {
     position: "absolute",
     bottom: 20,
-    right: 20,
-    backgroundColor: "#FFC107", // Color dorado
+    left: 20,
+    backgroundColor: "#FFC107",
     borderRadius: 50,
     padding: 15,
     elevation: 10,
@@ -440,5 +472,3 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
 });
-
-export default RestaurantsPage;
