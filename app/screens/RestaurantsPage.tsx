@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { getAllRestaurants, deleteRestaurant, createRestaurant, updateRestaurant } from "@/api/restaurantApi";  // Agregamos la función getPlatillosByRestaurant
 import { useAuth } from "../useAuth"; // Importa el hook useAuth
 import { MaterialIcons } from '@expo/vector-icons'; // Icono de editar
-import MapView, { Marker } from "react-native-maps"; // Importar MapView y Marker
+//import MapView, { Marker } from "react-native-maps"; // Importar MapView y Marker
 
 export default function RestaurantsPage() {
   const router = useRouter();
@@ -152,7 +152,7 @@ export default function RestaurantsPage() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      
+
 
       {/* Restaurant List */}
       <FlatList
@@ -228,7 +228,7 @@ export default function RestaurantsPage() {
           <View style={styles.detailsModalContainer}>
             <View style={styles.detailsModalContent}>
               <Text style={styles.modalTitle}>Platillos de {selectedRestaurant?.name}</Text>
-              
+
               {/* Mostrar los platillos */}
               <FlatList
                 data={platillos}

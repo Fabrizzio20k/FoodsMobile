@@ -13,13 +13,13 @@ import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";  // Importa el manipulator
 import { useRouter } from "expo-router";
 import axios from "axios";
-
-const BASE_URL = "https://your-api-url.com"; // Reemplaza con la URL de tu API
+import { BASE_URL } from "../Api";
+import { JwtAuthResponse } from "@/api/registerAndLoginApi";
 
 // Función de registro
-export const register = async (formData: FormData): Promise<any> => {
+export const register = async (formData: FormData): Promise<JwtAuthResponse> => {
     try {
-        const response = await axios.post(
+        const response = await axios.post<JwtAuthResponse>(
             `${BASE_URL}/auth/register`,
             formData,
             {
@@ -34,17 +34,21 @@ export const register = async (formData: FormData): Promise<any> => {
 
             // Ver más detalles del error
             if (error.response) {
+                // Si hay una respuesta (sería el caso si el backend responde con un código de error)
                 console.error("Error response status:", error.response.status);
                 console.error("Error response data:", error.response.data);
                 console.error("Error response headers:", error.response.headers);
             } else if (error.request) {
+                // Si no se recibe respuesta, pero la solicitud fue realizada
                 console.error("Error request:", error.request);
             } else {
+                // Si ocurrió otro tipo de error
                 console.error("Error message:", error.message);
             }
 
             throw error.response?.data?.message || "Error desconocido durante el registro";
         } else {
+            // Si no es un error de Axios, mostrar el error inesperado
             console.error("Error inesperado:", error);
             throw "Error desconocido durante el registro";
         }
@@ -59,7 +63,7 @@ export default function RegisterScreen() {
     const [password, setPassword] = useState("");
     const [name, setName] = useState("");
     const [bio, setBio] = useState("");
-    const [profilePicture, setProfilePicture] = useState(null);
+    const [profilePicture, setProfilePicture] = useState<{ uri: string } | null>(null);
     const [userType, setUserType] = useState<"CONSUMER" | "INFLUENCER">("CONSUMER");
     const [isLoading, setIsLoading] = useState(false);
 
@@ -87,7 +91,6 @@ export default function RegisterScreen() {
         }
     };
 
-    // Función de registro con FormData
     const handleRegister = async () => {
         if (!email || !password || !name || !bio) {
             Alert.alert("Error", "Por favor completa todos los campos.");
@@ -115,8 +118,8 @@ export default function RegisterScreen() {
                 // Crear un objeto de tipo `File` con el blob obtenido
                 const file = {
                     uri: uri,
-                    name: "profile.jpg",  // Renombrar el archivo para que sea un JPG
-                    type: "image/jpeg",   // Especificar el tipo de archivo
+                    name: "profile.jpg",
+                    type: "image/jpeg",
                 };
 
                 // Agregar el archivo al FormData con el nombre correcto

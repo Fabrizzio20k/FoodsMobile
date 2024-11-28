@@ -5,6 +5,7 @@ import { useAuth } from "../useAuth"; // Asegúrate de que esté bien importado
 import { useRouter } from "expo-router";
 import { BASE_URL } from "@/app/Api"; // Asegúrate de que el BASE_URL está configurado correctamente
 import { User } from "@/api/registerAndLoginApi";
+import axios from 'axios';
 
 const ProfileScreen = () => {
   const { token, user, setToken, setUser } = useAuth();
@@ -27,119 +28,100 @@ const ProfileScreen = () => {
   };
 
   const handleSaveChanges = async () => {
-    // Verificar el token antes de proceder
-    console.log("Token de autenticación:", token);  // Esto imprimirá el token para que puedas verificar su valor
-  
     if (!token) {
       Alert.alert("Error", "No se pudo obtener el token de autenticación.");
       return;
     }
-  
-    if (!user || !user.userId) {  // Verificar si el user o el id son inválidos
+
+    if (!user || !user.userId) {
       Alert.alert("Error", "No se pudo obtener el ID del usuario.");
       return;
     }
-  
+
     const formData = new FormData();
-  
+
     // Agregar datos del usuario (nombre, biografía)
     if (editedUserData) {
-      formData.append(
-        "user",
-        new Blob(
-          [JSON.stringify({ name: editedUserData.name || "", bio: editedUserData.bio || "" })],
-          { type: "application/json" }
-        )
+      const userDataBlob = new Blob(
+        [JSON.stringify({ name: editedUserData.name, bio: editedUserData.bio })],
+        { type: "application/json" }  // Asegúrate de que el tipo es 'application/json'
       );
-      console.log("Datos del usuario añadidos al FormData:", editedUserData);
+
+      formData.append("user", userDataBlob);
+      formData.append("user", JSON.stringify({ name: editedUserData.name, bio: editedUserData.bio }));
     } else {
       Alert.alert("Error", "No se pudo obtener los datos del usuario editado.");
       return;
     }
-  
+
+
     // Empaquetar la imagen seleccionada si existe
     if (profilePicture) {
-      console.log("Imagen seleccionada:", profilePicture.uri);
-      fetch(profilePicture.uri)
-        .then((response) => response.blob())
-        .then((blob) => {
-          const file = {
-            uri: profilePicture.uri,
-            name: "profile.jpg",  // El nombre del archivo que deseas usar
-            type: "image/jpeg",   // El tipo de la imagen
-          };
-  
-          console.log("Archivo de imagen convertido en Blob:", file);
-          
-          // Agregar la imagen al FormData
-          formData.append("profilePicture", file);
-          console.log("Imagen añadida al FormData:", formData);
-  
-          // Hacer la solicitud PUT para actualizar el perfil
-          fetch(`${BASE_URL}/users/${user.userId}`, {
-            method: "PUT",
-            headers: {
-              Authorization: `Bearer ${token}`,  // El token es utilizado aquí
-            },
-            body: formData,
-          })
-            .then((response) => {
-              console.log("Respuesta del servidor:", response);
-              if (!response.ok) {
-                console.log("Error en la respuesta:", response);
-                return response.text().then((text) => {
-                  console.log("Cuerpo del error:", text); // Ver el contenido del error
-                  Alert.alert("Error", "Hubo un problema al actualizar el perfil. Intenta de nuevo.");
-                });
-              }
-              return response.json();
-            })
-            .then((updatedUser) => {
-              console.log("Perfil actualizado con éxito:", updatedUser);
-              setUser(updatedUser);
-              alert("Perfil actualizado correctamente");
-            })
-            .catch((error) => {
-              console.error("Error en la solicitud PUT:", error);
-              Alert.alert("Error", "Hubo un problema al actualizar el perfil. Intenta de nuevo.");
-            });
-        })
-        .catch((error) => {
-          console.error("Error al procesar la imagen:", error);
-          Alert.alert("Error", "Hubo un problema al procesar la imagen.");
-        });
+      try {
+        const uri = profilePicture.uri;
+
+        // Obtener la imagen como un "blob" usando fetch
+        const response = await fetch(uri);
+        const blob = await response.blob();
+
+        // Crear un objeto de tipo `File` con el blob obtenido
+        const file = {
+          uri: uri,
+          name: "profile_update.jpg",
+          type: "image/jpeg",
+        };
+
+        // Agregar el archivo al FormData con el nombre correcto
+        formData.append("image", file as any); // Asegúrate de que la clave sea "image"
+      } catch (error) {
+        console.error("Error al procesar la imagen:", error);
+        Alert.alert("Error", "Hubo un problema al procesar la imagen.");
+        return;
+      }
     } else {
-      // Si no hay imagen, solo actualiza los datos de usuario sin la imagen
-      fetch(`${BASE_URL}/users/${user.userId}`, {
-        method: "PUT",
+      console.log("No se seleccionó ninguna imagen");
+    }
+
+    try {
+      console.log("Enviando datos de perfil actualizados:", formData.get("user"));
+      const response = await axios.put(`${BASE_URL}/users/${user.userId}`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
         },
-        body: formData,
-      })
-        .then((response) => {
-          console.log("Respuesta del servidor:", response);
-          if (!response.ok) {
-            console.log("Error en la respuesta:", response);
-            return response.text().then((text) => {
-              console.log("Cuerpo del error:", text); // Ver el contenido del error
-              Alert.alert("Error", "Hubo un problema al actualizar el perfil. Intenta de nuevo.");
-            });
-          }
-          return response.json();
-        })
-        .then((updatedUser) => {
-          console.log("Perfil actualizado con éxito sin imagen:", updatedUser);
-          setUser(updatedUser);
-          alert("Perfil actualizado correctamente");
-        })
-        .catch((error) => {
-          console.error("Error en la solicitud PUT:", error);
-          Alert.alert("Error", "Hubo un problema al actualizar el perfil. Intenta de nuevo.");
-        });
+      });
+
+      // Si la respuesta es exitosa
+      console.log("Perfil actualizado con éxito:", response.data);
+      setUser(response.data);
+      alert("Perfil actualizado correctamente");
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        // Si el error es de Axios, mostrar detalles completos
+        console.error("Error al actualizar el perfil:", error);
+
+        if (error.response) {
+          // Si hay una respuesta (error 4xx o 5xx)
+          console.error("Error response status:", error.response.status);
+          console.error("Error response data:", error.response.data);
+          console.error("Error response headers:", error.response.headers);
+        } else if (error.request) {
+          // Si la solicitud fue realizada, pero no se recibió respuesta
+          console.error("Error request:", error.request);
+        } else {
+          // Otro tipo de error
+          console.error("Error message:", error.message);
+        }
+
+        Alert.alert("Error", `Hubo un problema al actualizar el perfil. ${error.response?.data?.message || 'Intenta de nuevo.'}`);
+      } else {
+        // Si no es un error de Axios, mostrar un error general
+        console.error("Error inesperado:", error);
+        Alert.alert("Error", "Hubo un problema al actualizar el perfil. Intenta de nuevo.");
+      }
     }
   };
-  
+
 
   // Función para cancelar los cambios
   const handleCancelEdit = () => {
