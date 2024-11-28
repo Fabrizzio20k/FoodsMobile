@@ -4,6 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../useAuth"; // Asegúrate de que esté bien importado
 import { useRouter } from "expo-router";
 import { BASE_URL } from "@/app/Api"; // Asegúrate de que el BASE_URL está configurado correctamente
+import { User } from "@/api/registerAndLoginApi";
 
 const ProfileScreen = () => {
   const { token, user, setToken, setUser } = useAuth();
@@ -11,76 +12,58 @@ const ProfileScreen = () => {
 
   const [isEditing, setIsEditing] = useState(false); // Para controlar la vista de edición
   const [editedUserData, setEditedUserData] = useState(user); // Datos del perfil que se editarán
-  const [newImage, setNewImage] = useState<string | null>(null); // Para almacenar la nueva imagen seleccionada
+  const [profilePicture, setProfilePicture] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
-  // Función para manejar la selección de imagen
-  const handlePickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (permissionResult.granted === false) {
-      Alert.alert("Permiso denegado", "Necesitamos permiso para acceder a la galería.");
-      return;
-    }
-
+  const handleImagePick = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
       allowsEditing: true,
+      quality: 1,
     });
 
-    if (!result.cancelled) {
-      const { uri, type, size } = result.assets[0];
-
-      // Verificar el tipo de archivo detectado
-      const fileExtension = uri.split(".").pop()?.toLowerCase();
-      if (fileExtension !== "jpg" && fileExtension !== "jpeg") {
-        Alert.alert("Error", "Por favor selecciona una imagen en formato .jpg o .jpeg.");
-        return;
-      }
-
-      // Verificar que el tamaño de la imagen no exceda los 2 MB
-      if (size > 2 * 1024 * 1024) {
-        Alert.alert("Error", "La imagen debe ser menor a 2 MB.");
-        return;
-      }
-
-      // Si la imagen es válida, actualizar el estado
-      setNewImage(uri); // Almacenamos la nueva imagen seleccionada
+    if (!result.canceled && result.assets.length > 0) {
+      setProfilePicture(result.assets[0]); // Almacenar el objeto seleccionado
     }
   };
 
-  // Función para guardar los cambios
   const handleSaveChanges = async () => {
     if (!token) {
       Alert.alert("Error", "No se pudo obtener el token de autenticación.");
       return;
     }
 
-    const userId = user?.id; // Asumiendo que el usuario tiene un ID
+    if (!user || !user.userId) {  // Verificar si el user o el id son inválidos
+      Alert.alert("Error", "No se pudo obtener el ID del usuario.");
+      return;
+    }
 
     const formData = new FormData();
 
-    // Adjuntar los datos del perfil (nombre, biografía)
-    formData.append("user", JSON.stringify({
-      name: editedUserData.name,
-      bio: editedUserData.bio,
-    }));
+    // Agregar datos del usuario (nombre, biografía)
+    if (editedUserData) {
+      formData.append(
+        "user",
+        new Blob(
+          [JSON.stringify({ name: editedUserData.name || "", bio: editedUserData.bio || "" })],
+          { type: "application/json" }
+        )
+      );
+    } else {
+      Alert.alert("Error", "No se pudo obtener los datos del usuario editado.");
+      return;
+    }    
 
-    // Adjuntar la nueva imagen si se ha seleccionado una
-    if (newImage) {
-      formData.append("image", {
-        uri: newImage,
-        name: "profile-picture.jpg", // Nombre del archivo de imagen
-        type: "image/jpeg", // Tipo de archivo
-      });
+    if (profilePicture) {
+      const response = await fetch(profilePicture.uri);
+      const blob = await response.blob();
+      formData.append("image", blob, "profile.jpg");
     }
 
     try {
-      // Hacer la petición PUT al backend para actualizar el perfil
-      const response = await fetch(`${BASE_URL}/users/${userId}`, {
+      const response = await fetch(`${BASE_URL}/users/${user.userId}`, {
         method: "PUT",
         headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${token}`
         },
         body: formData,
       });
@@ -90,15 +73,15 @@ const ProfileScreen = () => {
       }
 
       const updatedUser = await response.json();
-      setUser(updatedUser); // Actualiza el estado con los nuevos datos
-      setIsEditing(false); // Cierra el modal de edición
-
-      toast.success("Perfil actualizado correctamente");
+      setUser(updatedUser);
+      alert("Perfil actualizado correctamente");
     } catch (error) {
       console.error(error);
-      toast.error("No se pudo actualizar el perfil");
+      alert("Hubo un problema al actualizar el perfil. Intenta de nuevo.");
     }
+
   };
+
 
   // Función para cancelar los cambios
   const handleCancelEdit = () => {
@@ -180,31 +163,31 @@ const ProfileScreen = () => {
             <TextInput
               style={styles.input}
               placeholder="Nombre"
-              value={editedUserData.name}
-              onChangeText={(text) => setEditedUserData({ ...editedUserData, name: text })}
+              value={editedUserData?.name || ""}
+              onChangeText={(text) => setEditedUserData({ ...editedUserData, name: text } as User)}
             />
 
             {/* Campo de Biografía */}
             <TextInput
               style={styles.input}
               placeholder="Biografía"
-              value={editedUserData.bio}
-              onChangeText={(text) => setEditedUserData({ ...editedUserData, bio: text })}
+              value={editedUserData?.bio || ""}
+              onChangeText={(text) => setEditedUserData({ ...editedUserData, bio: text } as User)}
               multiline
             />
 
             {/* Selección de Imagen */}
             <TouchableOpacity
               style={styles.selectImageButton}
-              onPress={handlePickImage}
+              onPress={handleImagePick}
             >
               <Text style={styles.selectImageButtonText}>Seleccionar Foto de Perfil</Text>
             </TouchableOpacity>
 
             {/* Mostrar la imagen seleccionada */}
-            {newImage && (
+            {profilePicture && (
               <Image
-                source={{ uri: newImage }}
+                source={{ uri: profilePicture.uri }}
                 style={styles.selectedImage}
               />
             )}

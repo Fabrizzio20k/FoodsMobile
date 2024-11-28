@@ -10,21 +10,60 @@ import {
     StyleSheet,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";  // Importa el manipulator
 import { useRouter } from "expo-router";
-import { register } from "../Api";
+import axios from "axios";
+
+const BASE_URL = "https://your-api-url.com"; // Reemplaza con la URL de tu API
+
+// Función de registro
+export const register = async (formData: FormData): Promise<any> => {
+    try {
+        const response = await axios.post(
+            `${BASE_URL}/auth/register`,
+            formData,
+            {
+                headers: { "Content-Type": "multipart/form-data" },
+            }
+        );
+        return response.data;
+    } catch (error) {
+        if (axios.isAxiosError(error)) {
+            // Detalles completos del error de Axios
+            console.error("Error al registrarse:", error);
+
+            // Ver más detalles del error
+            if (error.response) {
+                console.error("Error response status:", error.response.status);
+                console.error("Error response data:", error.response.data);
+                console.error("Error response headers:", error.response.headers);
+            } else if (error.request) {
+                console.error("Error request:", error.request);
+            } else {
+                console.error("Error message:", error.message);
+            }
+
+            throw error.response?.data?.message || "Error desconocido durante el registro";
+        } else {
+            console.error("Error inesperado:", error);
+            throw "Error desconocido durante el registro";
+        }
+    }
+};
 
 export default function RegisterScreen() {
     const router = useRouter();
 
-    // Cambiar el tipo de profilePicture
+    // Estados para los campos del formulario
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [name, setName] = useState("");
     const [bio, setBio] = useState("");
-    const [profilePicture, setProfilePicture] = useState<ImagePicker.ImagePickerAsset | null>(null);
+    const [profilePicture, setProfilePicture] = useState(null);
     const [userType, setUserType] = useState<"CONSUMER" | "INFLUENCER">("CONSUMER");
     const [isLoading, setIsLoading] = useState(false);
 
+    // Función para manejar la selección de imagen
     const handleImagePick = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -33,10 +72,22 @@ export default function RegisterScreen() {
         });
 
         if (!result.canceled && result.assets.length > 0) {
-            setProfilePicture(result.assets[0]); // Almacenar el objeto seleccionado
+            const asset = result.assets[0];
+            // Convertir la imagen a formato JPG
+            const manipResult = await ImageManipulator.manipulateAsync(
+                asset.uri,
+                [], // No cambiar tamaño, solo formato
+                { compress: 1, format: ImageManipulator.SaveFormat.JPEG } // Convertir a JPG
+            );
+
+            console.log("Imagen convertida a JPG:", manipResult.uri); // Verificar la URI de la imagen convertida
+
+            // Guardar la imagen convertida en el estado
+            setProfilePicture(manipResult);
         }
     };
 
+    // Función de registro con FormData
     const handleRegister = async () => {
         if (!email || !password || !name || !bio) {
             Alert.alert("Error", "Por favor completa todos los campos.");
@@ -52,17 +103,35 @@ export default function RegisterScreen() {
             formData.append("name", name);
             formData.append("bio", bio);
             formData.append("userType", userType);
+
+            // Si se seleccionó una imagen de perfil
             if (profilePicture) {
-                const response = await fetch(profilePicture.uri);
+                const uri = profilePicture.uri;
+
+                // Obtener la imagen como un "blob" usando fetch
+                const response = await fetch(uri);
                 const blob = await response.blob();
-                formData.append("profilePicture", blob, "profile.jpg");
+
+                // Crear un objeto de tipo `File` con el blob obtenido
+                const file = {
+                    uri: uri,
+                    name: "profile.jpg",  // Renombrar el archivo para que sea un JPG
+                    type: "image/jpeg",   // Especificar el tipo de archivo
+                };
+
+                // Agregar el archivo al FormData con el nombre correcto
+                formData.append("profilePicture", file as any);
             }
 
-            await register(formData);
+            // Verifica los datos que estás enviando
+            console.log("Datos FormData: ", formData);
+
+            // Hacer la solicitud
+            await register(formData);  // Llamar a la función de registro
             Alert.alert("Éxito", "¡Registro exitoso!");
             router.push("../screens/LoginScreen");
         } catch (error) {
-            console.error(error);
+            console.error("Error en el registro:", error);
             Alert.alert("Error", "Hubo un problema al registrarse. Intenta de nuevo.");
         } finally {
             setIsLoading(false);

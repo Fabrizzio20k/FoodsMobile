@@ -245,10 +245,7 @@ const RestaurantsPage = () => {
                   longitudeDelta: 0.0421,
                 }}
               >
-                <Marker coordinate={{
-                  latitude: parseFloat(selectedRestaurant?.latitude || "0"),
-                  longitude: parseFloat(selectedRestaurant?.longitude || "0")
-                }} />
+                <Marker coordinate={{ latitude: parseFloat(selectedRestaurant?.latitude || "0"), longitude: parseFloat(selectedRestaurant?.longitude || "0") }} />
               </MapView>
 
               <TouchableOpacity onPress={() => setIsDetailsModalOpen(false)} style={styles.closeButton}>
@@ -258,10 +255,19 @@ const RestaurantsPage = () => {
           </View>
         </Modal>
       )}
+
+      {/* Botón flotante de agregar restaurante */}
+      <TouchableOpacity 
+        style={styles.floatingButton}
+        onPress={() => setIsModalOpen(true)}  // Abre el modal para agregar un nuevo restaurante
+      >
+        <MaterialIcons name="add" size={30} color="#fff" />
+      </TouchableOpacity>
     </View>
   );
 };
 
+// Estilos
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -395,11 +401,14 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 10,
   },
-  map: {
-    width: "100%",
-    height: 200,
-    borderRadius: 10,
-    marginTop: 20,
+  floatingButton: {
+    position: "absolute",
+    bottom: 20,
+    right: 20,
+    backgroundColor: "#FFC107", // Color dorado
+    borderRadius: 50,
+    padding: 15,
+    elevation: 10,
   },
   detailsModalContainer: {
     flex: 1,
@@ -423,6 +432,12 @@ const styles = StyleSheet.create({
   closeButtonText: {
     color: "#fff",
     fontSize: 16,
+  },
+  map: {
+    width: "100%",
+    height: 200,
+    borderRadius: 10,
+    marginTop: 20,
   },
 });
 
