@@ -14,7 +14,7 @@ import * as ImageManipulator from "expo-image-manipulator";  // Importa el manip
 import { useRouter } from "expo-router";
 import axios from "axios";
 
-const BASE_URL = "https://your-api-url.com"; // Reemplaza con la URL de tu API
+const BASE_URL = "http://54.236.12.197:8080"; // Reemplaza con la URL de tu API
 
 // Función de registro
 export const register = async (formData: FormData): Promise<any> => {
