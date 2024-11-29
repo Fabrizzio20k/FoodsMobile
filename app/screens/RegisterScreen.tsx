@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
     View,
     Text,
@@ -8,10 +8,12 @@ import {
     Alert,
     Image,
     StyleSheet,
+    Button,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";  // Importa el manipulator
 import { useRouter } from "expo-router";
+import { CameraView, CameraType, useCameraPermissions } from "expo-camera";  // Importamos las funciones necesarias
 import axios from "axios";
 import { BASE_URL } from "../Api";
 import { JwtAuthResponse } from "@/api/registerAndLoginApi";
@@ -19,36 +21,15 @@ import { JwtAuthResponse } from "@/api/registerAndLoginApi";
 // Función de registro
 export const register = async (formData: FormData): Promise<JwtAuthResponse> => {
     try {
-        const response = await axios.post<JwtAuthResponse>(
-            `${BASE_URL}/auth/register`,
-            formData,
-            {
-                headers: { "Content-Type": "multipart/form-data" },
-            }
-        );
+        const response = await axios.post<JwtAuthResponse>(`${BASE_URL}/auth/register`, formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+        });
         return response.data;
     } catch (error) {
         if (axios.isAxiosError(error)) {
-            // Detalles completos del error de Axios
             console.error("Error al registrarse:", error);
-
-            // Ver más detalles del error
-            if (error.response) {
-                // Si hay una respuesta (sería el caso si el backend responde con un código de error)
-                console.error("Error response status:", error.response.status);
-                console.error("Error response data:", error.response.data);
-                console.error("Error response headers:", error.response.headers);
-            } else if (error.request) {
-                // Si no se recibe respuesta, pero la solicitud fue realizada
-                console.error("Error request:", error.request);
-            } else {
-                // Si ocurrió otro tipo de error
-                console.error("Error message:", error.message);
-            }
-
             throw error.response?.data?.message || "Error desconocido durante el registro";
         } else {
-            // Si no es un error de Axios, mostrar el error inesperado
             console.error("Error inesperado:", error);
             throw "Error desconocido durante el registro";
         }
@@ -57,8 +38,6 @@ export const register = async (formData: FormData): Promise<JwtAuthResponse> => 
 
 export default function RegisterScreen() {
     const router = useRouter();
-
-    // Estados para los campos del formulario
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [name, setName] = useState("");
@@ -66,28 +45,82 @@ export default function RegisterScreen() {
     const [profilePicture, setProfilePicture] = useState<{ uri: string } | null>(null);
     const [userType, setUserType] = useState<"CONSUMER" | "INFLUENCER">("CONSUMER");
     const [isLoading, setIsLoading] = useState(false);
+    const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+    const [galleryPermission, setGalleryPermission] = useState(false);
+    const [cameraFacing, setCameraFacing] = useState<CameraType>("back");
 
-    // Función para manejar la selección de imagen
-    const handleImagePick = async () => {
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            quality: 1,
-        });
+    // Crear la referencia a la cámara
+    const cameraRef = useRef<CameraView>(null);
 
-        if (!result.canceled && result.assets.length > 0) {
-            const asset = result.assets[0];
-            // Convertir la imagen a formato JPG
-            const manipResult = await ImageManipulator.manipulateAsync(
-                asset.uri,
-                [], // No cambiar tamaño, solo formato
-                { compress: 1, format: ImageManipulator.SaveFormat.JPEG } // Convertir a JPG
-            );
+    // Verificar si tenemos permisos para la cámara
+    if (!cameraPermission) {
+        return <View />;
+    }
 
-            console.log("Imagen convertida a JPG:", manipResult.uri); // Verificar la URI de la imagen convertida
+    if (!cameraPermission.granted) {
+        return (
+            <View style={styles.container}>
+                <Text style={styles.message}>We need your permission to show the camera</Text>
+                <Button onPress={requestCameraPermission} title="grant permission" />
+            </View>
+        );
+    }
 
-            // Guardar la imagen convertida en el estado
-            setProfilePicture(manipResult);
+    // Función para cambiar la cámara entre "delante" y "detrás"
+    const toggleCameraFacing = () => {
+        setCameraFacing((current) => (current === "back" ? "front" : "back"));
+    };
+
+    // Función para capturar la foto
+    const capturePhoto = async () => {
+        if (cameraPermission.granted) {
+            const camera = cameraRef.current;
+            if (camera) {
+                // Intentar tomar la foto
+                const photo = await camera.takePictureAsync({
+                    quality: 0.7,
+                    base64: true,
+                });
+                if (photo && photo.uri) {
+                    const manipulatedPhoto = await ImageManipulator.manipulateAsync(
+                        photo.uri,
+                        [],
+                        { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
+                    );
+                    console.log("Foto capturada:", manipulatedPhoto.uri);
+                    setProfilePicture(manipulatedPhoto);
+                } else {
+                    console.error("Error: No se pudo tomar la foto.");
+                    Alert.alert("Error", "No se pudo tomar la foto.");
+                }
+            }
+        }
+    };
+
+    // Función para seleccionar una imagen de la galería
+    const pickImage = async () => {
+        // Verificar los permisos de galería
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (permission.granted) {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [4, 3],
+                quality: 1,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                const manipulatedPhoto = await ImageManipulator.manipulateAsync(
+                    result.assets[0].uri,
+                    [],
+                    { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
+                );
+                setProfilePicture(manipulatedPhoto);
+            } else {
+                console.log("No se seleccionó ninguna imagen.");
+            }
+        } else {
+            Alert.alert("Permiso de galería denegado", "Por favor permite el acceso a la galería.");
         }
     };
 
@@ -107,29 +140,20 @@ export default function RegisterScreen() {
             formData.append("bio", bio);
             formData.append("userType", userType);
 
-            // Si se seleccionó una imagen de perfil
             if (profilePicture) {
                 const uri = profilePicture.uri;
-
-                // Obtener la imagen como un "blob" usando fetch
                 const response = await fetch(uri);
                 const blob = await response.blob();
 
-                // Crear un objeto de tipo `File` con el blob obtenido
                 const file = {
                     uri: uri,
                     name: "profile.jpg",
                     type: "image/jpeg",
                 };
 
-                // Agregar el archivo al FormData con el nombre correcto
                 formData.append("profilePicture", file as any);
             }
 
-            // Verifica los datos que estás enviando
-            console.log("Datos FormData: ", formData);
-
-            // Hacer la solicitud
             await register(formData);  // Llamar a la función de registro
             Alert.alert("Éxito", "¡Registro exitoso!");
             router.push("../screens/LoginScreen");
@@ -173,17 +197,18 @@ export default function RegisterScreen() {
                 onChangeText={setBio}
             />
 
-            <TouchableOpacity style={styles.imagePicker} onPress={handleImagePick}>
+            <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
                 <Text style={styles.imagePickerText}>
-                    {profilePicture ? "Cambiar Imagen de Perfil" : "Subir Imagen de Perfil"}
+                    {profilePicture ? "Cambiar Imagen de Perfil" : "Elegir Imagen de Perfil desde Galería"}
                 </Text>
             </TouchableOpacity>
 
+            <TouchableOpacity style={styles.imagePicker} onPress={capturePhoto}>
+                <Text style={styles.imagePickerText}>Tomar Foto de Perfil</Text>
+            </TouchableOpacity>
+
             {profilePicture && (
-                <Image
-                    source={{ uri: profilePicture.uri }}
-                    style={styles.imagePreview}
-                />
+                <Image source={{ uri: profilePicture.uri }} style={styles.imagePreview} />
             )}
 
             <View style={styles.userTypeContainer}>
@@ -216,6 +241,14 @@ export default function RegisterScreen() {
             <TouchableOpacity onPress={() => router.push("../screens/LoginScreen")}>
                 <Text style={styles.loginLink}>¿Ya tienes cuenta? Inicia sesión</Text>
             </TouchableOpacity>
+
+            <CameraView style={styles.camera} facing={cameraFacing} ref={cameraRef}>
+                <View style={styles.buttonContainer}>
+                    <TouchableOpacity style={styles.button} onPress={toggleCameraFacing}>
+                        <Text style={styles.text}>Cambiar Cámara</Text>
+                    </TouchableOpacity>
+                </View>
+            </CameraView>
         </View>
     );
 }
@@ -267,4 +300,9 @@ const styles = StyleSheet.create({
         color: "#007BFF",
         textDecorationLine: "underline",
     },
+    camera: { flex: 1 },
+    buttonContainer: { position: "absolute", bottom: 20, left: 20, right: 20, flexDirection: "row" },
+    button: { flex: 1, alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.5)", padding: 10 },
+    text: { fontSize: 20, color: "white" },
+    message: { fontSize: 16, color: "red", textAlign: "center", marginBottom: 20 },
 });

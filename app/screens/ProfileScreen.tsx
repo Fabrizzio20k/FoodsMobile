@@ -1,19 +1,33 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, Image, TouchableOpacity, Alert, Modal, TextInput } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { useAuth } from "../useAuth"; // Asegúrate de que esté bien importado
+import { useAuth } from "../useAuth";
 import { useRouter } from "expo-router";
-import { BASE_URL } from "@/app/Api"; // Asegúrate de que el BASE_URL está configurado correctamente
+import { BASE_URL } from "@/app/Api";
 import { User } from "@/api/registerAndLoginApi";
 import axios from 'axios';
+import { Accelerometer } from "expo-sensors"; // Importamos el acelerómetro
 
 const ProfileScreen = () => {
   const { token, user, setToken, setUser } = useAuth();
   const router = useRouter();
 
-  const [isEditing, setIsEditing] = useState(false); // Para controlar la vista de edición
-  const [editedUserData, setEditedUserData] = useState(user); // Datos del perfil que se editarán
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedUserData, setEditedUserData] = useState(user);
   const [profilePicture, setProfilePicture] = useState<ImagePicker.ImagePickerAsset | null>(null);
+
+  // Estado para almacenar los valores del acelerómetro
+  const [acceleration, setAcceleration] = useState({ x: 0, y: 0, z: 0 });
+
+  useEffect(() => {
+    // Suscribirse al acelerómetro para obtener los valores de aceleración
+    const subscription = Accelerometer.addListener((accelData) => {
+      setAcceleration(accelData);
+    });
+
+    // Limpiar cuando el componente se desmonte
+    return () => subscription.remove();
+  }, []);
 
   const handleImagePick = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -23,7 +37,7 @@ const ProfileScreen = () => {
     });
 
     if (!result.canceled && result.assets.length > 0) {
-      setProfilePicture(result.assets[0]); // Almacenar el objeto seleccionado
+      setProfilePicture(result.assets[0]);
     }
   };
 
@@ -40,46 +54,34 @@ const ProfileScreen = () => {
 
     const formData = new FormData();
 
-    // Agregar datos del usuario (nombre, biografía)
     if (editedUserData) {
       const userDataBlob = new Blob(
         [JSON.stringify({ name: editedUserData.name, bio: editedUserData.bio })],
-        { type: "application/json" }  // Asegúrate de que el tipo es 'application/json'
+        { type: "application/json" }
       );
 
       formData.append("user", userDataBlob);
-      formData.append("user", JSON.stringify({ name: editedUserData.name, bio: editedUserData.bio }));
     } else {
       Alert.alert("Error", "No se pudo obtener los datos del usuario editado.");
       return;
     }
 
-
-    // Empaquetar la imagen seleccionada si existe
     if (profilePicture) {
       try {
         const uri = profilePicture.uri;
-
-        // Obtener la imagen como un "blob" usando fetch
         const response = await fetch(uri);
         const blob = await response.blob();
-
-        // Crear un objeto de tipo `File` con el blob obtenido
         const file = {
           uri: uri,
           name: "profile_update.jpg",
           type: "image/jpeg",
         };
-
-        // Agregar el archivo al FormData con el nombre correcto
-        formData.append("image", file as any); // Asegúrate de que la clave sea "image"
+        formData.append("image", file as any);
       } catch (error) {
         console.error("Error al procesar la imagen:", error);
         Alert.alert("Error", "Hubo un problema al procesar la imagen.");
         return;
       }
-    } else {
-      console.log("No se seleccionó ninguna imagen");
     }
 
     try {
@@ -91,45 +93,25 @@ const ProfileScreen = () => {
         },
       });
 
-      // Si la respuesta es exitosa
       console.log("Perfil actualizado con éxito:", response.data);
       setUser(response.data);
       alert("Perfil actualizado correctamente");
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        // Si el error es de Axios, mostrar detalles completos
         console.error("Error al actualizar el perfil:", error);
-
-        if (error.response) {
-          // Si hay una respuesta (error 4xx o 5xx)
-          console.error("Error response status:", error.response.status);
-          console.error("Error response data:", error.response.data);
-          console.error("Error response headers:", error.response.headers);
-        } else if (error.request) {
-          // Si la solicitud fue realizada, pero no se recibió respuesta
-          console.error("Error request:", error.request);
-        } else {
-          // Otro tipo de error
-          console.error("Error message:", error.message);
-        }
-
         Alert.alert("Error", `Hubo un problema al actualizar el perfil. ${error.response?.data?.message || 'Intenta de nuevo.'}`);
       } else {
-        // Si no es un error de Axios, mostrar un error general
         console.error("Error inesperado:", error);
         Alert.alert("Error", "Hubo un problema al actualizar el perfil. Intenta de nuevo.");
       }
     }
   };
 
-
-  // Función para cancelar los cambios
   const handleCancelEdit = () => {
-    setEditedUserData(user); // Restaurar los datos del perfil original
-    setIsEditing(false); // Cerrar el modal sin guardar cambios
+    setEditedUserData(user);
+    setIsEditing(false);
   };
 
-  // Función para manejar el logout
   const handleLogout = () => {
     Alert.alert("Cerrar Sesión", "¿Estás seguro de que deseas cerrar sesión?", [
       { text: "Cancelar", style: "cancel" },
@@ -138,7 +120,7 @@ const ProfileScreen = () => {
         onPress: () => {
           setToken(null);
           setUser(null);
-          router.replace("../screens/LoginScreen"); // Redirigir al inicio de sesión
+          router.replace("../screens/LoginScreen");
         },
       },
     ]);
@@ -146,7 +128,6 @@ const ProfileScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* Botón de regresar */}
       <TouchableOpacity
         style={styles.backButton}
         onPress={() => router.replace("../screens/HomeLogged")}
@@ -154,9 +135,7 @@ const ProfileScreen = () => {
         <Text style={styles.backButtonText}>Regresar</Text>
       </TouchableOpacity>
 
-      {/* Tarjeta del perfil */}
       <View style={styles.profileCard}>
-        {/* Imagen del perfil */}
         <Image
           source={{
             uri: user?.profilePicture || "https://via.placeholder.com/150",
@@ -166,7 +145,6 @@ const ProfileScreen = () => {
         <Text style={styles.userName}>{user?.name || "Usuario"}</Text>
         <Text style={styles.userEmail}>{user?.email || "usuario@correo.com"}</Text>
 
-        {/* Información Personal */}
         <View style={styles.infoSection}>
           <Text style={styles.infoLabel}>
             <Text style={styles.infoTitle}>Nombre:</Text> {user?.name || "No especificado"}
@@ -179,11 +157,18 @@ const ProfileScreen = () => {
           </Text>
         </View>
 
-        {/* Botones de acción */}
+        {/* Mostrar los valores del acelerómetro */}
+        <View style={styles.accelerationSection}>
+          <Text style={styles.accelerationLabel}>Acelerómetro:</Text>
+          <Text style={styles.accelerationValue}>X: {acceleration.x.toFixed(2)}</Text>
+          <Text style={styles.accelerationValue}>Y: {acceleration.y.toFixed(2)}</Text>
+          <Text style={styles.accelerationValue}>Z: {acceleration.z.toFixed(2)}</Text>
+        </View>
+
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={styles.editButton}
-            onPress={() => setIsEditing(true)} // Activar el modal de edición
+            onPress={() => setIsEditing(true)}
           >
             <Text style={styles.buttonText}>Editar Perfil</Text>
           </TouchableOpacity>
@@ -193,13 +178,11 @@ const ProfileScreen = () => {
         </View>
       </View>
 
-      {/* Modal de edición */}
       {isEditing && (
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Editar Perfil</Text>
 
-            {/* Campo de Nombre */}
             <TextInput
               style={styles.input}
               placeholder="Nombre"
@@ -207,7 +190,6 @@ const ProfileScreen = () => {
               onChangeText={(text) => setEditedUserData({ ...editedUserData, name: text } as User)}
             />
 
-            {/* Campo de Biografía */}
             <TextInput
               style={styles.input}
               placeholder="Biografía"
@@ -216,7 +198,6 @@ const ProfileScreen = () => {
               multiline
             />
 
-            {/* Selección de Imagen */}
             <TouchableOpacity
               style={styles.selectImageButton}
               onPress={handleImagePick}
@@ -224,7 +205,6 @@ const ProfileScreen = () => {
               <Text style={styles.selectImageButtonText}>Seleccionar Foto de Perfil</Text>
             </TouchableOpacity>
 
-            {/* Mostrar la imagen seleccionada */}
             {profilePicture && (
               <Image
                 source={{ uri: profilePicture.uri }}
@@ -253,6 +233,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#f0f0f0",
     alignItems: "center",
     paddingTop: 40,
+  },
+  accelerationSection: {
+    marginTop: 20,
+    paddingLeft: 10,
+  },
+  accelerationLabel: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  accelerationValue: {
+    fontSize: 16,
+    marginBottom: 5,
   },
   backButton: {
     position: "absolute",
